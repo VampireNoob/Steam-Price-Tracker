@@ -8,8 +8,14 @@ Telegram-Nachricht.
 
 Gedacht für regelmäßige Ausführung per Windows-Aufgabenplanung
 (ein Skriptlauf = eine Prüfung aller Spiele, dann Programmende).
+
+Jeder Lauf wird zusätzlich in tracker.log protokolliert (auch Fehler) --
+wichtig, weil bei automatischen Läufen über die Aufgabenplanung niemand
+die Konsolenausgabe sieht.
 """
 
+import logging
+from logging.handlers import RotatingFileHandler
 import sqlite3
 from datetime import datetime, timezone
 
@@ -18,6 +24,17 @@ import requests
 import common
 
 STEAM_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
+LOG_FILE = common.BASE_DIR / "tracker.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+log = logging.getLogger("price_tracker")
 
 
 def init_db():
@@ -39,25 +56,24 @@ def init_db():
 
 
 def fetch_price(appid: int):
-    """Fragt die (inoffizielle) Steam-Store-API nach dem aktuellen Preis ab.
-    Gibt None zurück, wenn z.B. keine Preisdaten verfügbar sind."""
     params = {"appids": appid, "cc": common.COUNTRY_CODE, "filters": "price_overview"}
     try:
         resp = requests.get(STEAM_DETAILS_URL, params=params, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
-        print(f"  [Warnung] Anfrage für appid {appid} fehlgeschlagen: {exc}")
+        log.warning("Anfrage für appid %s fehlgeschlagen: %s", appid, exc)
         return None
 
     data = resp.json()
     entry = data.get(str(appid), {})
     if not entry.get("success"):
-        print(f"  [Warnung] Steam meldet 'success: false' für appid {appid}")
+        log.warning("Steam meldet 'success: false' für appid %s", appid)
         return None
 
     overview = entry.get("data", {}).get("price_overview")
     if overview is None:
-        return None  # z.B. kostenloses Spiel oder regional nicht gelistet
+        log.info("Kein price_overview für appid %s (z.B. kostenlos/regional nicht gelistet)", appid)
+        return None
 
     return {
         "price_cents": overview["final"],
@@ -89,11 +105,12 @@ def format_price(cents: int) -> str:
     return f"{cents / 100:.2f} €".replace(".", ",")
 
 
-def main():
+def run():
+    log.info("=== Lauf gestartet ===")
     token, chat_id = common.load_config()
     games = common.load_games()
     if not games:
-        print("Keine Spiele in games.json. Erst mit manage_games.py welche hinzufügen.")
+        log.warning("Keine Spiele in games.json. Erst mit manage_games.py welche hinzufügen.")
         return
 
     conn = init_db()
@@ -101,7 +118,7 @@ def main():
 
     for game in games:
         name, appid = game["name"], game["appid"]
-        print(f"Prüfe: {name} ({appid}) ...")
+        log.info("Prüfe: %s (%s)", name, appid)
         current = fetch_price(appid)
         if current is None:
             continue
@@ -110,8 +127,8 @@ def main():
         save_price(conn, appid, name, current["price_cents"], current["discount_percent"])
 
         if previous is None:
-            print(f"  Erster Datensatz: {format_price(current['price_cents'])} "
-                  f"(-{current['discount_percent']}%)")
+            log.info("  Erster Datensatz: %s (-%s%%)",
+                format_price(current["price_cents"]), current["discount_percent"])
             continue
 
         prev_price_cents, prev_discount = previous
@@ -125,16 +142,27 @@ def main():
             if current["discount_percent"] > 0:
                 msg += f"\nAktueller Rabatt: -{current['discount_percent']}%"
             changed_messages.append(msg)
-            print("  Änderung erkannt -> Telegram wird benachrichtigt")
+            log.info("  Änderung erkannt -> Telegram wird benachrichtigt")
         else:
-            print(f"  Keine Änderung ({format_price(current['price_cents'])})")
+            log.info("  Keine Änderung (%s)", format_price(current["price_cents"]))
 
     conn.close()
 
     if changed_messages:
         common.send_telegram(token, chat_id, "\n\n".join(changed_messages))
+        log.info("Telegram-Nachricht gesendet (%d Änderung(en))", len(changed_messages))
     else:
-        print("Keine Preisänderungen, keine Nachricht gesendet.")
+        log.info("Keine Preisänderungen, keine Nachricht gesendet.")
+
+    log.info("=== Lauf beendet ===")
+
+
+def main():
+    try:
+        run()
+    except Exception:
+        log.exception("Unerwarteter Fehler -- Lauf abgebrochen")
+        raise
 
 
 if __name__ == "__main__":
