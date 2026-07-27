@@ -2,6 +2,8 @@
 
 A small application built as a school project to practice Python fundamentals: connecting to an external API, persisting data, and sending notifications. It tracks the Steam prices of a user-defined list of games and sends a Telegram message whenever a price changes. It can be controlled from three independent places — the terminal, Telegram, or a browser — all working on the same data.
 
+![Steam Price Tracker web interface](screenshot-web.png)
+
 ## What it does (current state)
 
 - **Search & manage tracked games** (`manage_games.py`) — an interactive console menu lets you search Steam by game name (no need to know the AppID), add matches to your tracking list, or remove games again. The list is stored in `games.json` and persists across restarts.
