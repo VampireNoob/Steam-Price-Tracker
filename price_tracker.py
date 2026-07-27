@@ -70,9 +70,17 @@ def fetch_price(appid: int):
         log.warning("Steam meldet 'success: false' für appid %s", appid)
         return None
 
-    overview = entry.get("data", {}).get("price_overview")
+    game_data = entry.get("data")
+    if not isinstance(game_data, dict):
+        # Steam liefert für manche AppIDs (z.B. Bundles/Sonderfälle) statt
+        # eines Objekts eine leere Liste o.ä. zurück -- dann gibt es keine
+        # brauchbaren Preisdaten, kein Grund zum Absturz.
+        log.warning(f"Unerwartetes 'data'-Format für appid {appid} ({type(game_data).__name__}) -- übersprungen")
+        return None
+
+    overview = game_data.get("price_overview")
     if overview is None:
-        log.info("Kein price_overview für appid %s (z.B. kostenlos/regional nicht gelistet)", appid)
+        log.info(f"Kein price_overview für appid {appid} (z.B. kostenlos/regional nicht gelistet)")
         return None
 
     return {

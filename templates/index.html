@@ -10,43 +10,36 @@
     <button type="submit" class="btn">Jetzt prüfen</button>
 </form>
 
-<table>
-    <thead>
-        <tr>
-            <th></th>
-            <th>Spiel</th>
-            <th>Preis</th>
-            <th>Rabatt</th>
-            <th>Zuletzt geprüft</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for g in games %}
-        <tr>
-            <td class="thumb-cell">
-                {% if g.image %}<img src="{{ g.image }}" alt="" class="thumb">{% endif %}
-            </td>
-            <td>{{ g.name }}</td>
-            <td class="price">{{ g.price }}</td>
-            <td>
-        {% if g.discount_percent > 0 %}
-            <span class="badge">-{{ g.discount_percent }}%</span>
-        {% else %}
-            <span class="muted">–</span>
-        {% endif %}
-            </td>
-            <td class="muted">{{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}</td>
-            <td>
-                <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
+<div class="grid">
+    {% for g in games %}
+    <div class="card">
+        <div class="card-img-wrap">
+            {% if g.image %}
+            <img src="{{ g.image }}" alt="" class="card-img">
+            {% else %}
+            <div class="card-img card-img-placeholder"></div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-title">{{ g.name }}</div>
+            <div class="card-price-row">
+                <span class="card-price">{{ g.price }}</span>
+                {% if g.discount_percent > 0 %}
+                <span class="badge">-{{ g.discount_percent }}%</span>
+                {% endif %}
+            </div>
+            <div class="card-meta">
+                {{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}
+            </div>
+            <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
+                class="card-footer"
                 onsubmit="return confirm('{{ g.name }} nicht mehr tracken?');">
                 <button type="submit" class="btn-remove">Entfernen</button>
-                </form>
-            </td>
-        </tr>
+            </form>
+        </div>
+    </div>
     {% endfor %}
-    </tbody>
-</table>
+</div>
 {% else %}
 <p class="empty">Noch keine Spiele getrackt. <a href="{{ url_for('add_game') }}">Jetzt eins hinzufügen</a>.</p>
 {% endif %}
