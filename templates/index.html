@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<header>
+    <h1>Getrackte Spiele</h1>
+    <p class="sub">{{ games|length }} Spiel{{ 'e' if games|length != 1 else '' }} im Blick</p>
+</header>
+
+{% if games %}
+<form action="{{ url_for('check_now') }}" method="post" class="check-form">
+    <button type="submit" class="btn">Jetzt prüfen</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Spiel</th>
+            <th>Preis</th>
+            <th>Rabatt</th>
+            <th>Zuletzt geprüft</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in games %}
+        <tr>
+            <td>{{ g.name }}</td>
+            <td class="price">{{ g.price }}</td>
+            <td>
+        {% if g.discount_percent > 0 %}
+            <span class="badge">-{{ g.discount_percent }}%</span>
+        {% else %}
+            <span class="muted">–</span>
+        {% endif %}
+            </td>
+            <td class="muted">{{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}</td>
+            <td>
+                <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
+                onsubmit="return confirm('{{ g.name }} nicht mehr tracken?');">
+                <button type="submit" class="btn-remove">Entfernen</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="empty">Noch keine Spiele getrackt. <a href="{{ url_for('add_game') }}">Jetzt eins hinzufügen</a>.</p>
+{% endif %}
+{% endblock %}

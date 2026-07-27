@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Spiel hinzufügen – Steam Price Tracker{% endblock %}
+{% block content %}
+<header>
+    <h1>Spiel hinzufügen</h1>
+    <p class="sub">Namen eingeben, aus den Steam-Treffern auswählen</p>
+</header>
+
+<form action="{{ url_for('add_game') }}" method="post" class="search-form">
+    <input type="text" name="term" placeholder="z.B. Forza Horizon 5" value="{{ term }}" autofocus required>
+    <button type="submit" class="btn">Suchen</button>
+</form>
+
+{% if results %}
+<ul class="results">
+    {% for r in results %}
+    <li>
+        <span>{{ r.name }}</span>
+        <form action="{{ url_for('confirm_add') }}" method="post">
+            <input type="hidden" name="name" value="{{ r.name }}">
+            <input type="hidden" name="appid" value="{{ r.appid }}">
+            <button type="submit" class="btn-small">Hinzufügen</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% elif term %}
+<p class="empty">Keine Treffer für "{{ term }}".</p>
+{% endif %}
+{% endblock %}
