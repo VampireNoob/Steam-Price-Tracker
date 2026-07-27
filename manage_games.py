@@ -43,7 +43,7 @@ def add_game(token, chat_id):
         print(f"'{picked['name']}' wird bereits getrackt.\n")
         return
 
-    games.append(picked)
+    games.append({"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")})
     common.save_games(games)
     print(f"'{picked['name']}' wurde hinzugefügt.\n")
     common.send_telegram(token, chat_id, f"➕ '{picked['name']}' wird jetzt getrackt.")

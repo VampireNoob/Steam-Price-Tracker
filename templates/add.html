@@ -15,11 +15,15 @@
 <ul class="results">
     {% for r in results %}
     <li>
+    <div class="result-info">
+        {% if r.image %}<img src="{{ r.image }}" alt="" class="thumb">{% endif %}
         <span>{{ r.name }}</span>
+    </div>
         <form action="{{ url_for('confirm_add') }}" method="post">
-            <input type="hidden" name="name" value="{{ r.name }}">
-            <input type="hidden" name="appid" value="{{ r.appid }}">
-            <button type="submit" class="btn-small">Hinzufügen</button>
+        <input type="hidden" name="name" value="{{ r.name }}">
+        <input type="hidden" name="appid" value="{{ r.appid }}">
+        <input type="hidden" name="image" value="{{ r.image or '' }}">
+        <button type="submit" class="btn-small">Hinzufügen</button>
         </form>
     </li>
     {% endfor %}

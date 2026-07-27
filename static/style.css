@@ -66,3 +66,7 @@ nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:
     padding:12px 16px;border-top:1px solid var(--line);font-size:14px;
 }
 .results li:first-child{border-top:none;}
+
+.thumb{width:64px;height:24px;object-fit:cover;border-radius:4px;display:block;}
+.thumb-cell{width:76px;}
+.result-info{display:flex;align-items:center;gap:12px;}

@@ -3,12 +3,12 @@ Telegram-Bot-Steuerung für den Steam-Preis-Tracker.
 Läuft dauerhaft in einer Schleife (Long Polling) und reagiert auf Befehle,
 die du direkt im Telegram-Chat mit deinem Bot schreibst:
 
-  /list             -- zeigt aktuell getrackte Spiele
-  /add <Name>        -- sucht ein Spiel auf Steam, zeigt Treffer zur Auswahl
-  <Nummer>           -- wählt einen Treffer aus einer vorherigen /add-Suche
-  /remove <Nummer>   -- entfernt ein Spiel (Nummer aus /list)
-  /check             -- führt sofort einen Preis-Check aus
-  /help              -- zeigt diese Übersicht
+    /list             -- zeigt aktuell getrackte Spiele
+    /add <Name>        -- sucht ein Spiel auf Steam, zeigt Treffer zur Auswahl
+    <Nummer>           -- wählt einen Treffer aus einer vorherigen /add-Suche
+    /remove <Nummer>   -- entfernt ein Spiel (Nummer aus /list)
+    /check             -- führt sofort einen Preis-Check aus
+    /help              -- zeigt diese Übersicht
 
 Nur Nachrichten von der in .env eingetragenen TELEGRAM_CHAT_ID werden
 verarbeitet, alle anderen werden stillschweigend ignoriert.
@@ -42,7 +42,18 @@ def handle_list(token, chat_id):
     if not games:
         common.send_telegram(token, chat_id, "Aktuell werden keine Spiele getrackt.")
         return
-    lines = [f"{i}. {g['name']}" for i, g in enumerate(games, start=1)]
+
+    lines = []
+    for i, g in enumerate(games, start=1):
+        price_info = common.get_latest_price(g["appid"])
+        if price_info:
+            price_part = price_info["price"]
+            if price_info["discount_percent"] > 0:
+                price_part += f" (-{price_info['discount_percent']}%)"
+        else:
+            price_part = "noch nicht geprüft"
+        lines.append(f"{i}. {g['name']} -- {price_part}")
+
     common.send_telegram(token, chat_id, "Getrackte Spiele:\n" + "\n".join(lines))
 
 
@@ -80,7 +91,7 @@ def handle_pick(token, chat_id, number_text):
     if any(g["appid"] == picked["appid"] for g in games):
         common.send_telegram(token, chat_id, f"'{picked['name']}' wird bereits getrackt.")
         return
-    games.append(picked)
+    games.append({"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")})
     common.save_games(games)
     common.send_telegram(token, chat_id, f"✅ '{picked['name']}' wird jetzt getrackt.")
 

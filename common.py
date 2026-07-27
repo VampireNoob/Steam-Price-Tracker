@@ -1,10 +1,12 @@
 """
-Gemeinsam genutzte Funktionen für price_tracker.py und manage_games.py:
-Konfiguration laden, games.json lesen/schreiben, Telegram-Nachrichten senden.
+Gemeinsam genutzte Funktionen für price_tracker.py, manage_games.py,
+bot_listener.py und app.py: Konfiguration laden, games.json lesen/schreiben,
+Telegram-Nachrichten senden, Steam-Suche, letzten bekannten Preis abfragen.
 """
 
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -54,7 +56,8 @@ def send_telegram(token: str, chat_id: str, text: str):
 
 def search_steam_games(term: str, max_results: int = 8):
     """Sucht Spiele über die (inoffizielle) Steam-Store-Suche.
-    Gibt eine Liste von Treffern zurück: [{"name": ..., "appid": ...}, ...]"""
+    Gibt eine Liste von Treffern zurück:
+    [{"name": ..., "appid": ..., "image": <URL oder None>}, ...]"""
     params = {"term": term, "l": LANGUAGE, "cc": COUNTRY_CODE}
     try:
         resp = requests.get(STEAM_SEARCH_URL, params=params, timeout=10)
@@ -65,4 +68,30 @@ def search_steam_games(term: str, max_results: int = 8):
 
     data = resp.json()
     items = data.get("items", [])[:max_results]
-    return [{"name": item["name"], "appid": item["id"]} for item in items if "id" in item]
+    return [
+        {"name": item["name"], "appid": item["id"], "image": item.get("tiny_image")}
+        for item in items if "id" in item
+    ]
+
+
+def get_latest_price(appid: int):
+    """Liest den zuletzt bekannten Preis für ein Spiel aus prices.db.
+    Gibt None zurück, wenn noch kein price_tracker.py-Lauf für dieses Spiel
+    stattfand (z.B. gerade erst hinzugefügt)."""
+    if not DB_FILE.exists():
+        return None
+    conn = sqlite3.connect(DB_FILE)
+    row = conn.execute(
+        "SELECT price_cents, discount_percent, checked_at FROM price_history "
+        "WHERE appid = ? ORDER BY id DESC LIMIT 1",
+        (appid,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    price_cents, discount_percent, checked_at = row
+    return {
+        "price": f"{price_cents / 100:.2f} €".replace(".", ","),
+        "discount_percent": discount_percent,
+        "checked_at": checked_at,
+    }

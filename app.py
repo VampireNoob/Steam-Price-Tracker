@@ -10,8 +10,6 @@ lokal läuft und kein Login-System hat. Für ein späteres Cloud-Deployment
 müsste der Key aus der .env kommen statt im Code zu stehen.
 """
 
-import sqlite3
-
 from flask import Flask, flash, redirect, render_template, request, url_for
 
 import common
@@ -21,37 +19,16 @@ app = Flask(__name__)
 app.secret_key = "steam-tracker-local-dev"
 
 
-def get_latest_price(appid: int):
-    """Liest den zuletzt bekannten Preis für ein Spiel aus prices.db.
-    Gibt None zurück, wenn noch kein price_tracker.py-Lauf stattfand."""
-    if not common.DB_FILE.exists():
-        return None
-    conn = sqlite3.connect(common.DB_FILE)
-    row = conn.execute(
-        "SELECT price_cents, discount_percent, checked_at FROM price_history "
-        "WHERE appid = ? ORDER BY id DESC LIMIT 1",
-        (appid,),
-    ).fetchone()
-    conn.close()
-    if row is None:
-        return None
-    price_cents, discount_percent, checked_at = row
-    return {
-        "price": f"{price_cents / 100:.2f} €".replace(".", ","),
-        "discount_percent": discount_percent,
-        "checked_at": checked_at,
-    }
-
-
 @app.route("/")
 def index():
     games = common.load_games()
     rows = []
     for game in games:
-        price_info = get_latest_price(game["appid"])
+        price_info = common.get_latest_price(game["appid"])
         rows.append({
             "name": game["name"],
             "appid": game["appid"],
+            "image": game.get("image"),
             "price": price_info["price"] if price_info else "noch nicht geprüft",
             "discount_percent": price_info["discount_percent"] if price_info else 0,
             "checked_at": price_info["checked_at"] if price_info else None,
@@ -76,6 +53,7 @@ def add_game():
 def confirm_add():
     name = request.form.get("name")
     appid_raw = request.form.get("appid")
+    image = request.form.get("image") or None
     if not name or not appid_raw:
         flash("Ungültige Auswahl.", "error")
         return redirect(url_for("add_game"))
@@ -85,7 +63,7 @@ def confirm_add():
     if any(g["appid"] == appid for g in games):
         flash(f"'{name}' wird bereits getrackt.", "info")
     else:
-        games.append({"name": name, "appid": appid})
+        games.append({"name": name, "appid": appid, "image": image})
         common.save_games(games)
         flash(f"'{name}' wurde hinzugefügt.", "success")
     return redirect(url_for("index"))

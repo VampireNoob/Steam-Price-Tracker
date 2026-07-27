@@ -13,6 +13,7 @@
 <table>
     <thead>
         <tr>
+            <th></th>
             <th>Spiel</th>
             <th>Preis</th>
             <th>Rabatt</th>
@@ -23,6 +24,9 @@
     <tbody>
         {% for g in games %}
         <tr>
+            <td class="thumb-cell">
+                {% if g.image %}<img src="{{ g.image }}" alt="" class="thumb">{% endif %}
+            </td>
             <td>{{ g.name }}</td>
             <td class="price">{{ g.price }}</td>
             <td>
