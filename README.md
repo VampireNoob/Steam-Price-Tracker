@@ -38,13 +38,16 @@ All of the above has been manually tested end to end, including simulated and re
 
 Steam has a public, if unofficial, JSON API for both game search and price lookups, which made this project reliable without needing to scrape and parse HTML. Instant Gaming and similar shops don't offer anything comparable — supporting them would mean scraping their website directly, which is more fragile (breaks on layout changes), potentially against their terms of service, and out of scope for this project.
 
-## Roadmap — possible future extensions
+## Cloud hosting — considered, deliberately not pursued
 
-- **Cloud hosting** — GitHub Pages and Netlify can't run Python, so they're not an option here. If pursued:
-  - **GitHub Actions** to run the price-check on a schedule in the cloud, independent of whether a computer is turned on
-  - **PythonAnywhere** (or similar) to host the web frontend and/or the bot listener, since both need an actual Python runtime, not static hosting
+Cloud hosting was evaluated but consciously left out of scope for this version:
 
-This is intentionally out of scope for the current version — everything above runs locally and depends on the PC being on.
+- **GitHub Pages / Netlify** can't run Python at all, so they were never an option.
+- **Render's free tier** spins down after 15 minutes of inactivity — not acceptable for a bot that should always respond.
+- **PythonAnywhere's free tier** stays always-on, but restricts outbound requests to a fixed allowlist of domains that doesn't include Steam's store API — the core of this project wouldn't work there.
+- A shared cloud database (e.g. Supabase) would solve the underlying problem of keeping local, scheduled, and hosted instances in sync, but wasn't worth adding a third Supabase project for this specific use case.
+
+Running locally (PC + Windows Task Scheduler) turned out to be the more practical fit: no hosting limitations, no added infrastructure, and the project's actual purpose — personal, always-current price tracking — is fully served by that. Anyone curious is welcome to clone the repo and run it themselves.
 
 ## Tech stack
 
