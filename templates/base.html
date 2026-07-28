@@ -6,25 +6,61 @@
 <title>{% block title %}Steam Price Tracker{% endblock %}</title>
 <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script>
+// Theme so früh wie möglich setzen, bevor die Seite gerendert wird,
+// damit es beim Laden nicht kurz im falschen Theme aufblitzt.
+    (function () {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+</script>
 </head>
 <body>
 <div class="wrap">
-    <nav>
-        <a href="{{ url_for('index') }}" class="brand">Steam Price Tracker</a>
-        <a href="{{ url_for('add_game') }}" class="nav-link">+ Spiel hinzufügen</a>
-    </nav>
+<nav>
+    <a href="{{ url_for('index') }}" class="brand">Steam Price Tracker</a>
+    <div class="nav-right">
+    <a href="{{ url_for('add_game') }}" class="nav-link">+ Spiel hinzufügen</a>
+    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Theme wechseln" title="Theme wechseln">🌙</button>
+    </div>
+</nav>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flashes">
-            {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    {% endwith %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
 
-    {% block content %}{% endblock %}
+{% block content %}{% endblock %}
 </div>
+
+<script>
+const themeToggle = document.getElementById('themeToggle');
+const root = document.documentElement;
+
+function updateIcon() {
+    themeToggle.textContent = root.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+}
+updateIcon();
+
+themeToggle.addEventListener('click', () => {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+    root.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'light');
+    } else {
+    root.setAttribute('data-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+    }
+    updateIcon();
+});
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -10,37 +10,66 @@
     <button type="submit" class="btn">Jetzt prüfen</button>
 </form>
 
-<div class="grid">
+<div class="filter-bar">
+    <input type="text" id="gameFilter" placeholder="Spiel suchen ..." autocomplete="off">
+    <span class="filter-count" id="filterCount"></span>
+</div>
+
+<div class="grid" id="gameGrid">
     {% for g in games %}
-    <div class="card">
-        <div class="card-img-wrap">
-            {% if g.image %}
-            <img src="{{ g.image }}" alt="" class="card-img">
-            {% else %}
-            <div class="card-img card-img-placeholder"></div>
-            {% endif %}
+    <div class="card" data-name="{{ g.name|lower }}">
+    <div class="card-img-wrap">
+        {% if g.image %}
+        <img src="{{ g.image }}" alt="" class="card-img">
+        {% else %}
+        <div class="card-img card-img-placeholder"></div>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div class="card-title">{{ g.name }}</div>
+        <div class="card-price-row">
+        <span class="card-price">{{ g.price }}</span>
+        {% if g.discount_percent > 0 %}
+            <span class="badge">-{{ g.discount_percent }}%</span>
+        {% endif %}
         </div>
-        <div class="card-body">
-            <div class="card-title">{{ g.name }}</div>
-            <div class="card-price-row">
-                <span class="card-price">{{ g.price }}</span>
-                {% if g.discount_percent > 0 %}
-                <span class="badge">-{{ g.discount_percent }}%</span>
-                {% endif %}
-            </div>
-            <div class="card-meta">
-                {{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}
-            </div>
-            <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
-                class="card-footer"
-                onsubmit="return confirm('{{ g.name }} nicht mehr tracken?');">
-                <button type="submit" class="btn-remove">Entfernen</button>
-            </form>
+        <div class="card-meta">
+        {{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}
+        </div>
+        <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
+            class="card-footer"
+            onsubmit="return confirm('{{ g.name }} nicht mehr tracken?');">
+        <button type="submit" class="btn-remove">Entfernen</button>
+        </form>
         </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
 <p class="empty">Noch keine Spiele getrackt. <a href="{{ url_for('add_game') }}">Jetzt eins hinzufügen</a>.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if games %}
+<script>
+    const filterInput = document.getElementById('gameFilter');
+    const cards = Array.from(document.querySelectorAll('#gameGrid .card'));
+    const countEl = document.getElementById('filterCount');
+    const total = cards.length;
+
+    function applyFilter() {
+    const term = filterInput.value.trim().toLowerCase();
+    let visible = 0;
+    cards.forEach(card => {
+        const match = card.dataset.name.includes(term);
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    countEl.textContent = term ? `${visible} von ${total}` : '';
+    }
+
+    filterInput.addEventListener('input', applyFilter);
+</script>
 {% endif %}
 {% endblock %}
