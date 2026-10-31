@@ -112,6 +112,27 @@ def save_price(conn, appid: int, name: str, price_cents: int, discount_percent: 
 def format_price(cents: int) -> str:
     return f"{cents / 100:.2f} €".replace(".", ",")
 
+def price_direction(previous_cents: int, current_cents: int):
+    """Gibt 'gefallen', 'gestiegen' oder None (keine Änderung) zurück."""
+    if current_cents == previous_cents:
+        return None
+    return "gefallen" if current_cents < previous_cents else "gestiegen"
+
+
+def build_change_message(name: str, previous_cents: int, current: dict):
+    """Baut die Telegram-Meldung für eine Preisänderung.
+    Gibt None zurück, wenn sich der Preis nicht geändert hat."""
+    direction = price_direction(previous_cents, current["price_cents"])
+    if direction is None:
+        return None
+    msg = (
+        f"💰 {name}\n"
+        f"Preis {direction}: {format_price(previous_cents)} → "
+        f"{format_price(current['price_cents'])}"
+    )
+    if current["discount_percent"] > 0:
+        msg += f"\nAktueller Rabatt: -{current['discount_percent']}%"
+    return msg
 
 def run():
     log.info("=== Lauf gestartet ===")
@@ -139,16 +160,9 @@ def run():
                 format_price(current["price_cents"]), current["discount_percent"])
             continue
 
-        prev_price_cents, prev_discount = previous
-        if current["price_cents"] != prev_price_cents:
-            direction = "gefallen" if current["price_cents"] < prev_price_cents else "gestiegen"
-            msg = (
-                f"💰 {name}\n"
-                f"Preis {direction}: {format_price(prev_price_cents)} → "
-                f"{format_price(current['price_cents'])}"
-            )
-            if current["discount_percent"] > 0:
-                msg += f"\nAktueller Rabatt: -{current['discount_percent']}%"
+        prev_price_cents, _ = previous
+        msg = build_change_message(name, prev_price_cents, current)
+        if msg:
             changed_messages.append(msg)
             log.info("  Änderung erkannt -> Telegram wird benachrichtigt")
         else:
