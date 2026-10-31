@@ -60,13 +60,13 @@ def fetch_price(appid: int):
     try:
         resp = requests.get(STEAM_DETAILS_URL, params=params, timeout=10)
         resp.raise_for_status()
-    except requests.RequestException as exc:
-        log.warning("Anfrage für appid %s fehlgeschlagen: %s", appid, exc)
+        data = resp.json()          # kann ValueError werfen (z.B. HTML statt JSON)
+    except (requests.RequestException, ValueError) as exc:
+        log.warning("Anfrage für appid %s fehlgeschlagen: %s", appid, common.safe_error(exc))
         return None
 
-    data = resp.json()
-    entry = data.get(str(appid), {})
-    if not entry.get("success"):
+    entry = data.get(str(appid), {}) if isinstance(data, dict) else {}
+    if not isinstance(entry, dict) or not entry.get("success"):
         log.warning("Steam meldet 'success: false' für appid %s", appid)
         return None
 
@@ -156,6 +156,31 @@ def record_initial_price(game: dict) -> bool:
         return False
 
 
+def _check_game(conn, game):
+    """Prüft ein Spiel und speichert den Preis.
+    Gibt die Telegram-Meldung zurück, wenn sich der Preis geändert hat, sonst None."""
+    name, appid = game["name"], game["appid"]
+    log.info("Prüfe: %s (%s)", name, appid)
+    current = fetch_price(appid)
+    if current is None:
+        return None
+
+    previous = last_known_price(conn, appid)
+    save_price(conn, appid, name, current["price_cents"], current["discount_percent"])
+
+    if previous is None:
+        log.info("  Erster Datensatz: %s (-%s%%)",
+                    format_price(current["price_cents"]), current["discount_percent"])
+        return None
+
+    msg = build_change_message(name, previous[0], current)
+    if msg:
+        log.info("  Änderung erkannt -> Telegram wird benachrichtigt")
+    else:
+        log.info("  Keine Änderung (%s)", format_price(current["price_cents"]))
+    return msg
+
+
 def run():
     log.info("=== Lauf gestartet ===")
     token, chat_id = common.load_config()
@@ -164,33 +189,20 @@ def run():
         log.warning("Keine Spiele in games.json. Erst mit manage_games.py welche hinzufügen.")
         return
 
-    conn = init_db()
     changed_messages = []
-
-    for game in games:
-        name, appid = game["name"], game["appid"]
-        log.info("Prüfe: %s (%s)", name, appid)
-        current = fetch_price(appid)
-        if current is None:
-            continue
-
-        previous = last_known_price(conn, appid)
-        save_price(conn, appid, name, current["price_cents"], current["discount_percent"])
-
-        if previous is None:
-            log.info("  Erster Datensatz: %s (-%s%%)",
-                format_price(current["price_cents"]), current["discount_percent"])
-            continue
-
-        prev_price_cents, _ = previous
-        msg = build_change_message(name, prev_price_cents, current)
-        if msg:
-            changed_messages.append(msg)
-            log.info("  Änderung erkannt -> Telegram wird benachrichtigt")
-        else:
-            log.info("  Keine Änderung (%s)", format_price(current["price_cents"]))
-
-    conn.close()
+    conn = init_db()
+    try:
+        for game in games:
+            try:
+                msg = _check_game(conn, game)
+            except Exception:
+                # Ein defekter Eintrag darf nicht den Lauf für alle anderen abbrechen.
+                log.exception("Fehler bei Eintrag %r -- übersprungen", game)
+                continue
+            if msg:
+                changed_messages.append(msg)
+    finally:
+        conn.close()
 
     if changed_messages:
         common.send_telegram(token, chat_id, "\n\n".join(changed_messages))

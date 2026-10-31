@@ -8,6 +8,7 @@ import json
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -41,8 +42,25 @@ def load_games():
 
 
 def save_games(games):
-    with open(GAMES_FILE, "w", encoding="utf-8") as f:
-        json.dump(games, f, ensure_ascii=False, indent=2)
+    """Atomar schreiben: erst in eine Temp-Datei, dann ersetzen. So sieht kein
+    anderer Prozess (Web, Bot, Preis-Check) je eine halbfertige Datei, und bei
+    einem Fehler bleibt die alte games.json unverändert."""
+    tmp = GAMES_FILE.with_name(GAMES_FILE.name + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(games, f, ensure_ascii=False, indent=2)
+        for attempt in range(5):
+            try:
+                os.replace(tmp, GAMES_FILE)
+                break
+            except PermissionError:
+                # Windows: kurz gesperrt, wenn ein anderer Prozess die Datei gerade liest
+                if attempt == 4:
+                    raise
+                time.sleep(0.05)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def safe_error(exc: Exception) -> str:
@@ -69,9 +87,14 @@ def search_steam_games(term: str, max_results: int = 8):
     try:
         resp = requests.get(STEAM_SEARCH_URL, params=params, timeout=10)
         resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"[Warnung] Steam-Suche fehlgeschlagen: {exc}")
+        data = resp.json()          # kann ValueError werfen (z.B. HTML statt JSON)
+    except (requests.RequestException, ValueError) as exc:
+        print(f"[Warnung] Steam-Suche fehlgeschlagen: {safe_error(exc)}")
         return []
+
+    if not isinstance(data, dict):
+        return []
+    items = data.get("items", [])[:max_results]
 
     data = resp.json()
     items = data.get("items", [])[:max_results]
