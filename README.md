@@ -53,11 +53,13 @@ Running locally (PC + Windows Task Scheduler) turned out to be the more practica
 
 ## Tests
 
-`pytest` covers the core logic with 30 tests. No network access or credentials are needed, since Steam and Telegram are mocked:
+`pytest` runs an automated test suite. No network access or credentials are needed: Steam and Telegram are mocked, and real HTTP requests are blocked in tests.
 
 - price-change detection and the Telegram message built from it (`price_tracker.py`)
-- Steam API parsing, including a regression test for malformed responses (some bundles return `"data": []`)
-- game list persistence, Steam search and latest-price lookup (`common.py`)
+- Steam API parsing, including regression tests for malformed responses (HTML instead of JSON, bundles that return `"data": []`)
+- game list persistence (written atomically), Steam search and latest-price lookup (`common.py`)
+- web security: CSRF protection, input validation, XSS-safe templates, and no bot token in error output
+- instant price lookup when a game is added (web, bot, console)
 
 ```bash
 pip install pytest
