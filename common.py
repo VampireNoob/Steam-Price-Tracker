@@ -45,13 +45,20 @@ def save_games(games):
         json.dump(games, f, ensure_ascii=False, indent=2)
 
 
+def safe_error(exc: Exception) -> str:
+    """Fehlertext OHNE URL: requests-Fehler enthalten sonst die komplette Adresse,
+    bei Telegram also den Bot-Token."""
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    return type(exc).__name__ + (f" (HTTP {status})" if status else "")
+
+
 def send_telegram(token: str, chat_id: str, text: str):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
         resp = requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
-        print(f"  [Warnung] Telegram-Nachricht konnte nicht gesendet werden: {exc}")
+        print(f"  [Warnung] Telegram-Nachricht konnte nicht gesendet werden: {safe_error(exc)}")
 
 
 def search_steam_games(term: str, max_results: int = 8):

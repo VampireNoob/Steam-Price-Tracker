@@ -6,6 +6,7 @@ einem Neustart erhalten.
 """
 
 import common
+import price_tracker
 
 
 def list_games():
@@ -43,9 +44,13 @@ def add_game(token, chat_id):
         print(f"'{picked['name']}' wird bereits getrackt.\n")
         return
 
-    games.append({"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")})
+    new_game = {"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")}
+    games.append(new_game)
     common.save_games(games)
-    print(f"'{picked['name']}' wurde hinzugefügt.\n")
+    print(f"'{picked['name']}' wurde hinzugefügt.")
+    if price_tracker.record_initial_price(new_game):
+        print(f"Aktueller Preis: {common.get_latest_price(new_game['appid'])['price']}")
+    print()
     common.send_telegram(token, chat_id, f"➕ '{picked['name']}' wird jetzt getrackt.")
 
 

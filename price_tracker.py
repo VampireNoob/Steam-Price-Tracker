@@ -134,6 +134,28 @@ def build_change_message(name: str, previous_cents: int, current: dict):
         msg += f"\nAktueller Rabatt: -{current['discount_percent']}%"
     return msg
 
+
+def record_initial_price(game: dict) -> bool:
+    """Holt den Preis eines neu hinzugefügten Spiels sofort und speichert ihn,
+    damit es nicht bis zum nächsten Check 'noch nicht geprüft' zeigt.
+    Es wird keine Telegram-Nachricht gesendet. Gibt True zurück, wenn ein Preis
+    gespeichert wurde. Fehler führen nie zu einem Absturz des Aufrufers."""
+    try:
+        current = fetch_price(game["appid"])
+        if current is None:
+            return False
+        conn = init_db()
+        try:
+            save_price(conn, game["appid"], game["name"],
+                        current["price_cents"], current["discount_percent"])
+        finally:
+            conn.close()
+        return True
+    except Exception:
+        log.exception("Sofort-Preis für %r konnte nicht gespeichert werden", game.get("name"))
+        return False
+
+
 def run():
     log.info("=== Lauf gestartet ===")
     token, chat_id = common.load_config()

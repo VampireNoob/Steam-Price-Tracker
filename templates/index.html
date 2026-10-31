@@ -38,7 +38,7 @@
         </div>
         <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
             class="card-footer"
-            onsubmit="return confirm('{{ g.name }} nicht mehr tracken?');">
+            onsubmit='return confirm({{ (g.name ~ " nicht mehr tracken?")|tojson }});'>
         <button type="submit" class="btn-remove">Entfernen</button>
         </form>
         </div>

@@ -5,18 +5,38 @@ Browser-Oberfläche für dieselben Daten (games.json, prices.db), die auch
 price_tracker.py, manage_games.py und bot_listener.py nutzen -- alle vier
 Zugriffswege funktionieren nebeneinander, ohne sich zu stören.
 
-Hinweis: app.secret_key ist hier bewusst simpel/fest, weil die App nur
-lokal läuft und kein Login-System hat. Für ein späteres Cloud-Deployment
-müsste der Key aus der .env kommen statt im Code zu stehen.
+Sicherheit: Der secret_key kommt aus FLASK_SECRET_KEY (sonst zufällig pro Start),
+POST-Anfragen von fremden Webseiten werden abgelehnt (CSRF-Schutz) und der
+Debug-Modus ist standardmäßig aus (einschalten: FLASK_DEBUG=1).
 """
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+import os
+import secrets
+from urllib.parse import urlparse
+
+from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
 import common
 import price_tracker
 
 app = Flask(__name__)
-app.secret_key = "steam-tracker-local-dev"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+
+
+@app.before_request
+def reject_cross_site_posts():
+    """CSRF-Schutz: Formulare von fremden Webseiten (Origin != unser Host) ablehnen.
+    Browser senden bei Cross-Site-POSTs immer einen Origin-Header."""
+    if request.method == "POST":
+        origin = request.headers.get("Origin")
+        if origin and urlparse(origin).netloc != request.host:
+            abort(403)
+
+
+def is_steam_image(url: str) -> bool:
+    """Bilder nur von Steams eigenem CDN akzeptieren."""
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname or "").endswith(".steamstatic.com")
 
 
 @app.route("/")
@@ -51,10 +71,12 @@ def add_game():
 
 @app.route("/add/confirm", methods=["POST"])
 def confirm_add():
-    name = request.form.get("name")
-    appid_raw = request.form.get("appid")
+    name = request.form.get("name", "").strip()[:200]
+    appid_raw = request.form.get("appid", "")
     image = request.form.get("image") or None
-    if not name or not appid_raw:
+    if image and not is_steam_image(image):
+        image = None
+    if not name or not (appid_raw.isascii() and appid_raw.isdecimal() and len(appid_raw) <= 10):
         flash("Ungültige Auswahl.", "error")
         return redirect(url_for("add_game"))
 
@@ -63,8 +85,10 @@ def confirm_add():
     if any(g["appid"] == appid for g in games):
         flash(f"'{name}' wird bereits getrackt.", "info")
     else:
-        games.append({"name": name, "appid": appid, "image": image})
+        new_game = {"name": name, "appid": appid, "image": image}
+        games.append(new_game)
         common.save_games(games)
+        price_tracker.record_initial_price(new_game)
         flash(f"'{name}' wurde hinzugefügt.", "success")
     return redirect(url_for("index"))
 
@@ -88,4 +112,4 @@ def check_now():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="127.0.0.1")

@@ -33,7 +33,7 @@ def get_updates(token, offset=None):
         resp.raise_for_status()
         return resp.json().get("result", [])
     except requests.RequestException as exc:
-        print(f"[Warnung] getUpdates fehlgeschlagen: {exc}")
+        print(f"[Warnung] getUpdates fehlgeschlagen: {common.safe_error(exc)}")
         return []
 
 
@@ -91,9 +91,18 @@ def handle_pick(token, chat_id, number_text):
     if any(g["appid"] == picked["appid"] for g in games):
         common.send_telegram(token, chat_id, f"'{picked['name']}' wird bereits getrackt.")
         return
-    games.append({"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")})
+    new_game = {"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")}
+    games.append(new_game)
     common.save_games(games)
-    common.send_telegram(token, chat_id, f"✅ '{picked['name']}' wird jetzt getrackt.")
+
+    message = f"✅ '{picked['name']}' wird jetzt getrackt."
+    if price_tracker.record_initial_price(new_game):
+        price_info = common.get_latest_price(new_game["appid"])
+        if price_info:
+            message += f" Aktuell: {price_info['price']}"
+            if price_info["discount_percent"] > 0:
+                message += f" (-{price_info['discount_percent']}%)"
+    common.send_telegram(token, chat_id, message)
 
 
 def handle_remove(token, chat_id, number_text):
