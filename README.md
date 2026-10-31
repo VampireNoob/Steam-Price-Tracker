@@ -1,5 +1,7 @@
 # Steam Price Tracker
 
+[![Tests](https://github.com/VampireNoob/Steam-Price-Tracker/actions/workflows/tests.yml/badge.svg)](https://github.com/VampireNoob/Steam-Price-Tracker/actions/workflows/tests.yml)
+
 A small application built as a school project to practice Python fundamentals: connecting to an external API, persisting data, and sending notifications. It tracks the Steam prices of a user-defined list of games and sends a Telegram message whenever a price changes. It can be controlled from three independent places — the terminal, Telegram, or a browser — all working on the same data.
 
 ![Steam Price Tracker web interface](screenshot-web.png)
@@ -48,6 +50,21 @@ Cloud hosting was evaluated but consciously left out of scope for this version:
 - A shared cloud database (e.g. Supabase) would solve the underlying problem of keeping local, scheduled, and hosted instances in sync, but wasn't worth adding a third Supabase project for this specific use case.
 
 Running locally (PC + Windows Task Scheduler) turned out to be the more practical fit: no hosting limitations, no added infrastructure, and the project's actual purpose — personal, always-current price tracking — is fully served by that. Anyone curious is welcome to clone the repo and run it themselves.
+
+## Tests
+
+`pytest` covers the core logic with 30 tests. No network access or credentials are needed, since Steam and Telegram are mocked:
+
+- price-change detection and the Telegram message built from it (`price_tracker.py`)
+- Steam API parsing, including a regression test for malformed responses (some bundles return `"data": []`)
+- game list persistence, Steam search and latest-price lookup (`common.py`)
+
+```bash
+pip install pytest
+pytest
+```
+
+The suite also runs on every push via GitHub Actions.
 
 ## Tech stack
 

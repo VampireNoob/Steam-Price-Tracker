@@ -23,7 +23,7 @@ def test_load_games_without_file_returns_empty_list(paths):
 
 def test_save_and_load_roundtrip_keeps_umlauts(paths):
     games = [{"name": "Tom Clancy’s The Division® 2", "appid": 2221490, "image": None},
-             {"name": "Käse-Spiel", "appid": 1}]
+            {"name": "Käse-Spiel", "appid": 1}]
     common.save_games(games)
     assert common.load_games() == games
 
