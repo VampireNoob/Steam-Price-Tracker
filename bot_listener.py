@@ -194,6 +194,17 @@ def handle_check(token, chat_id):
         raise
 
 
+def parse_command(text):
+    """Zerlegt '/Add@MeinBot  Forza 5' in ('/add', 'Forza 5').
+    Text ohne führendes '/' ist kein Befehl: (None, text)."""
+    if not text.startswith("/"):
+        return None, text
+    parts = text.split(None, 1)
+    command = parts[0].split("@")[0].lower()   # '@BotName' wie in Gruppen entfernen
+    argument = parts[1].strip() if len(parts) > 1 else ""
+    return command, argument
+
+
 def process_message(token, allowed_chat_id, message):
     chat_id = str(message.get("chat", {}).get("id", ""))
     text = message.get("text", "").strip()
@@ -202,19 +213,21 @@ def process_message(token, allowed_chat_id, message):
         return  # Nachrichten von anderen Chats werden ignoriert
     if not text:
         return
-    log.info("Befehl empfangen: %s", text.split()[0])
 
-    if text.startswith("/add"):
-        handle_add(token, chat_id, text[len("/add"):].strip())
-    elif text.startswith("/remove"):
-        handle_remove(token, chat_id, text[len("/remove"):].strip())
-    elif text.startswith("/list"):
+    command, argument = parse_command(text)
+    log.info("Befehl empfangen: %s", command or "(Text)")   # nie den Inhalt protokollieren
+
+    if command == "/add":
+        handle_add(token, chat_id, argument)
+    elif command == "/remove":
+        handle_remove(token, chat_id, argument)
+    elif command == "/list":
         handle_list(token, chat_id)
-    elif text.startswith("/check"):
+    elif command == "/check":
         handle_check(token, chat_id)
-    elif text.startswith("/help") or text.startswith("/start"):
+    elif command in ("/help", "/start"):
         handle_help(token, chat_id)
-    elif text.isdigit():
+    elif command is None and text.isdigit():
         handle_pick(token, chat_id, text)
     else:
         common.send_telegram(token, chat_id, "Unbekannter Befehl. /help für Übersicht.")
