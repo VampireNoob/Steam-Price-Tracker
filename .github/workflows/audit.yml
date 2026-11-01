@@ -1,0 +1,30 @@
+name: Dependency audit
+
+on:
+  push:
+    paths: [requirements.txt]
+  pull_request:
+    paths: [requirements.txt]
+  schedule:
+    - cron: '0 6 * * 1'   # montags 06:00 UTC: neue Schwachstellen tauchen auch ohne Code-Änderung auf
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit dependencies
+        run: pip-audit -r requirements.txt
