@@ -105,4 +105,5 @@ def check_now():
 
 
 if __name__ == "__main__":
+    price_tracker.setup_logging()
     app.run(host="127.0.0.1")

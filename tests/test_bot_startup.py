@@ -86,6 +86,7 @@ def started(monkeypatch):
     info = {"messages": [], "offset": "nicht erreicht"}
     monkeypatch.setattr(common, "load_config", lambda: ("tok", "1"))
     monkeypatch.setattr(bot_listener, "setup_logging", lambda: None)
+    monkeypatch.setattr(bot_listener.price_tracker, "setup_logging", lambda: None)
     monkeypatch.setattr(common, "send_telegram", lambda t, c, text: info["messages"].append(text))
 
     def stop(token, chat_id, offset, failures, sleep=None):

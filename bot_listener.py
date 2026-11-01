@@ -291,6 +291,7 @@ def skip_pending_updates(token):
 def main():
     token, chat_id = common.load_config()
     setup_logging()
+    price_tracker.setup_logging()
     log.info("Bot gestartet")
     print("Bot-Listener gestartet. Strg+C zum Beenden.")
     offset = skip_pending_updates(token)

@@ -26,15 +26,26 @@ import common
 STEAM_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 LOG_FILE = common.BASE_DIR / "tracker.log"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
 log = logging.getLogger("price_tracker")
+_logging_ready = False
+
+
+def setup_logging():
+    """Richtet das Logging ein: tracker.log (mit Rotation) und Konsole. Wird nur von den
+    Programmen selbst aufgerufen (price_tracker.py, app.py, bot_listener.py), NICHT beim
+    Import -- sonst würden z.B. Tests in die echte tracker.log schreiben."""
+    global _logging_ready
+    if _logging_ready:
+        return
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    console_handler = logging.StreamHandler()
+    root = logging.getLogger()
+    for handler in (file_handler, console_handler):
+        handler.setFormatter(formatter)
+        root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    _logging_ready = True
 
 
 def init_db():
@@ -214,6 +225,7 @@ def run():
 
 
 def main():
+    setup_logging()
     try:
         run()
     except Exception:
