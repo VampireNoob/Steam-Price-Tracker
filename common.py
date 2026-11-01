@@ -9,6 +9,7 @@ import os
 import sqlite3
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -125,3 +126,19 @@ def get_latest_price(appid: int):
         "discount_percent": discount_percent,
         "checked_at": checked_at,
     }
+
+
+def format_local_time(iso_ts, tz=None):
+    """Wandelt einen UTC-Zeitstempel aus der Datenbank in lokale Zeit um,
+    z.B. '2026-07-27T12:49:00+00:00' -> '27.07.2026 14:49' (in Deutschland im Sommer).
+    Ohne Zeitzone im Text wird UTC angenommen. tz=None bedeutet: Zeitzone des Rechners.
+    Gibt None zurück, wenn kein Zeitstempel da ist, und den Rohtext, wenn er defekt ist."""
+    if not iso_ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+    except (ValueError, TypeError):
+        return str(iso_ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(tz).strftime("%d.%m.%Y %H:%M")

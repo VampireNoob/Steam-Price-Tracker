@@ -34,7 +34,7 @@
         {% endif %}
         </div>
         <div class="card-meta">
-        {{ g.checked_at[:16].replace('T', ' ') if g.checked_at else 'noch nicht geprüft' }}
+        {{ g.checked_at or 'noch nicht geprüft' }}
         </div>
         <form action="{{ url_for('remove_game', appid=g.appid) }}" method="post"
             class="card-footer"

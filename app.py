@@ -51,7 +51,7 @@ def index():
             "image": game.get("image"),
             "price": price_info["price"] if price_info else "noch nicht geprüft",
             "discount_percent": price_info["discount_percent"] if price_info else 0,
-            "checked_at": price_info["checked_at"] if price_info else None,
+            "checked_at": common.format_local_time(price_info["checked_at"]) if price_info else None,
         })
     return render_template("index.html", games=rows)
 
