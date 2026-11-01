@@ -48,10 +48,13 @@ def get_updates(token, offset=None):
     try:
         resp = requests.get(url, params=params, timeout=POLL_TIMEOUT + 10)
         resp.raise_for_status()
-        return resp.json().get("result", [])
-    except requests.RequestException as exc:
+        data = resp.json()          # kann ValueError werfen (z.B. HTML statt JSON)
+    except (requests.RequestException, ValueError) as exc:
         log.warning("getUpdates fehlgeschlagen: %s", common.safe_error(exc))
         return []
+
+    result = data.get("result", []) if isinstance(data, dict) else []
+    return result if isinstance(result, list) else []
 
 
 def handle_list(token, chat_id):
@@ -183,6 +186,27 @@ def process_message(token, allowed_chat_id, message):
         common.send_telegram(token, chat_id, "Unbekannter Befehl. /help für Übersicht.")
 
 
+def process_updates(token, allowed_chat_id, updates, offset=None):
+    """Verarbeitet eine Liste von Telegram-Updates und gibt den neuen offset zurück.
+    Ein Fehler bei einem Update wird protokolliert und beendet weder die übrigen
+    Updates noch den Bot. Der offset wird VOR der Verarbeitung weitergesetzt, damit
+    ein fehlerhaftes Update nicht endlos erneut geliefert wird."""
+    for update in updates:
+        try:
+            offset = update["update_id"] + 1
+            message = update.get("message")
+            if message:
+                process_message(token, allowed_chat_id, message)
+        except Exception:
+            log.exception("Fehler beim Verarbeiten eines Updates")
+            try:
+                common.send_telegram(token, allowed_chat_id,
+                                        "⚠️ Interner Fehler, Details stehen in bot.log.")
+            except Exception:
+                log.exception("Fehlermeldung an den Chat konnte nicht gesendet werden")
+    return offset
+
+
 def main():
     token, chat_id = common.load_config()
     setup_logging()
@@ -193,11 +217,7 @@ def main():
     offset = None
     while True:
         updates = get_updates(token, offset)
-        for update in updates:
-            offset = update["update_id"] + 1
-            message = update.get("message")
-            if message:
-                process_message(token, chat_id, message)
+        offset = process_updates(token, chat_id, updates, offset)
 
 
 if __name__ == "__main__":
