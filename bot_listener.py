@@ -15,6 +15,7 @@ verarbeitet, alle anderen werden stillschweigend ignoriert.
 """
 
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 
 import requests
@@ -41,6 +42,8 @@ def setup_logging():
 
 
 def get_updates(token, offset=None):
+    """Holt neue Telegram-Updates. Gibt eine Liste zurück (leer = nichts Neues)
+    oder None, wenn die Anfrage fehlgeschlagen ist (Netz, Telegram, kaputte Antwort)."""
     url = f"https://api.telegram.org/bot{token}/getUpdates"
     params = {"timeout": POLL_TIMEOUT}
     if offset is not None:
@@ -51,10 +54,13 @@ def get_updates(token, offset=None):
         data = resp.json()          # kann ValueError werfen (z.B. HTML statt JSON)
     except (requests.RequestException, ValueError) as exc:
         log.warning("getUpdates fehlgeschlagen: %s", common.safe_error(exc))
-        return []
+        return None
 
-    result = data.get("result", []) if isinstance(data, dict) else []
-    return result if isinstance(result, list) else []
+    result = data.get("result") if isinstance(data, dict) else None
+    if not isinstance(result, list):
+        log.warning("getUpdates lieferte ein unerwartetes Format")
+        return None
+    return result
 
 
 def handle_list(token, chat_id):
@@ -207,6 +213,27 @@ def process_updates(token, allowed_chat_id, updates, offset=None):
     return offset
 
 
+def retry_delay(failures: int) -> int:
+    """Wartezeit nach aufeinanderfolgenden Fehlversuchen: 5, 10, 20, 40, dann max. 60 Sekunden."""
+    return min(5 * 2 ** (failures - 1), 60)
+
+
+def poll_once(token, chat_id, offset, failures, sleep=time.sleep):
+    """Ein Durchlauf der Hauptschleife. Gibt (offset, failures) zurück.
+    Bei einem Fehler wird gewartet, statt sofort erneut anzufragen."""
+    updates = get_updates(token, offset)
+    if updates is None:
+        failures += 1
+        delay = retry_delay(failures)
+        log.warning("Telegram nicht erreichbar (Fehlversuch %d), nächster Versuch in %d s",
+                    failures, delay)
+        sleep(delay)
+        return offset, failures
+    if failures:
+        log.info("Verbindung zu Telegram wiederhergestellt")
+    return process_updates(token, chat_id, updates, offset), 0
+
+
 def main():
     token, chat_id = common.load_config()
     setup_logging()
@@ -214,10 +241,9 @@ def main():
     print("Bot-Listener gestartet. Strg+C zum Beenden.")
     common.send_telegram(token, chat_id, "🤖 Bot-Steuerung ist jetzt aktiv. /help für Befehle.")
 
-    offset = None
+    offset, failures = None, 0
     while True:
-        updates = get_updates(token, offset)
-        offset = process_updates(token, chat_id, updates, offset)
+        offset, failures = poll_once(token, chat_id, offset, failures)
 
 
 if __name__ == "__main__":

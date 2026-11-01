@@ -111,7 +111,7 @@ class FakeResponse:
 ])
 def test_get_updates_survives_malformed_responses(monkeypatch, response):
     monkeypatch.setattr(bot_listener.requests, "get", lambda *a, **k: response)
-    assert bot_listener.get_updates("tok") == []
+    assert bot_listener.get_updates("tok") is None      # None = Fehler, nicht "nichts Neues"
 
 
 def test_get_updates_returns_the_updates_list(monkeypatch):
@@ -137,6 +137,6 @@ def test_plain_value_error_from_json_is_survived(monkeypatch):
     # bot_listener, price_tracker und common benutzen dasselbe requests-Modul
     monkeypatch.setattr(bot_listener.requests, "get", lambda *a, **k: response)
 
-    assert bot_listener.get_updates("tok") == []
+    assert bot_listener.get_updates("tok") is None
     assert price_tracker.fetch_price(1) is None
     assert common.search_steam_games("x") == []
