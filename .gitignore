@@ -4,3 +4,4 @@ prices.db
 __pycache__/
 games.json
 tracker.log
+bot.log

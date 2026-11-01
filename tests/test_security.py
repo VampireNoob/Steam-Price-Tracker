@@ -84,9 +84,11 @@ def test_send_telegram_failure_does_not_print_token(monkeypatch, capsys):
     assert "GEHEIM" not in capsys.readouterr().out
 
 
-def test_get_updates_failure_does_not_print_token(monkeypatch, capsys):
+def test_get_updates_failure_does_not_leak_token(monkeypatch, capsys, caplog):
     def boom(*a, **k):
         raise requests.ConnectionError("failed for https://api.telegram.org/bot123456:GEHEIM/getUpdates")
     monkeypatch.setattr(bot_listener.requests, "get", boom)
     assert bot_listener.get_updates("123456:GEHEIM") == []
     assert "GEHEIM" not in capsys.readouterr().out
+    assert "GEHEIM" not in caplog.text
+    assert "getUpdates fehlgeschlagen" in caplog.text    # es wird aber protokolliert

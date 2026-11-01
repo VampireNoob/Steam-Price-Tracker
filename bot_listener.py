@@ -14,6 +14,9 @@ Nur Nachrichten von der in .env eingetragenen TELEGRAM_CHAT_ID werden
 verarbeitet, alle anderen werden stillschweigend ignoriert.
 """
 
+import logging
+from logging.handlers import RotatingFileHandler
+
 import requests
 
 import common
@@ -21,6 +24,20 @@ import price_tracker
 
 POLL_TIMEOUT = 25  # Sekunden Long Polling pro Anfrage
 pending_results = []  # letzte /add-Suchtreffer, zum Nachwählen per Nummer
+
+LOG_FILE = common.BASE_DIR / "bot.log"
+log = logging.getLogger("bot_listener")
+
+
+def setup_logging():
+    """Eigenes Log für den Bot: Unter pythonw gibt es keine Konsole, ohne Datei
+    wären Fehler unsichtbar. Gibt den Handler zurück (für Tests zum Aufräumen)."""
+    handler = RotatingFileHandler(LOG_FILE, maxBytes=500_000, backupCount=2, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    log.propagate = False   # nur in bot.log, nicht zusätzlich in tracker.log
+    return handler
 
 
 def get_updates(token, offset=None):
@@ -33,7 +50,7 @@ def get_updates(token, offset=None):
         resp.raise_for_status()
         return resp.json().get("result", [])
     except requests.RequestException as exc:
-        print(f"[Warnung] getUpdates fehlgeschlagen: {common.safe_error(exc)}")
+        log.warning("getUpdates fehlgeschlagen: %s", common.safe_error(exc))
         return []
 
 
@@ -143,8 +160,12 @@ def handle_check(token, chat_id):
 def process_message(token, allowed_chat_id, message):
     chat_id = str(message.get("chat", {}).get("id", ""))
     text = message.get("text", "").strip()
-    if chat_id != str(allowed_chat_id) or not text:
+    if chat_id != str(allowed_chat_id):
+        log.warning("Nachricht von fremdem Chat ignoriert (chat_id=%s)", chat_id)
         return  # Nachrichten von anderen Chats werden ignoriert
+    if not text:
+        return
+    log.info("Befehl empfangen: %s", text.split()[0])
 
     if text.startswith("/add"):
         handle_add(token, chat_id, text[len("/add"):].strip())
@@ -164,6 +185,8 @@ def process_message(token, allowed_chat_id, message):
 
 def main():
     token, chat_id = common.load_config()
+    setup_logging()
+    log.info("Bot gestartet")
     print("Bot-Listener gestartet. Strg+C zum Beenden.")
     common.send_telegram(token, chat_id, "🤖 Bot-Steuerung ist jetzt aktiv. /help für Befehle.")
 
