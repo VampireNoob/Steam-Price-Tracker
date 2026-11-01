@@ -122,6 +122,30 @@ def save_games(games):
         raise
 
 
+def add_game(name, appid, image=None):
+    """Fügt ein Spiel zur Liste hinzu. Gibt (spiel, neu) zurück; neu ist False, wenn
+    diese AppID schon getrackt wird (dann bleibt die Datei unverändert)."""
+    games = load_games()
+    for game in games:
+        if game["appid"] == appid:
+            return game, False
+    game = {"name": name, "appid": appid, "image": image}
+    games.append(game)
+    save_games(games)
+    return game, True
+
+
+def remove_game(appid):
+    """Entfernt das Spiel mit dieser AppID. Gibt das entfernte Spiel zurück
+    oder None, wenn es nicht (mehr) in der Liste steht."""
+    games = load_games()
+    removed = next((g for g in games if g["appid"] == appid), None)
+    if removed is None:
+        return None
+    save_games([g for g in games if g["appid"] != appid])
+    return removed
+
+
 def safe_error(exc: Exception) -> str:
     """Fehlertext OHNE URL: requests-Fehler enthalten sonst die komplette Adresse,
     bei Telegram also den Bot-Token."""

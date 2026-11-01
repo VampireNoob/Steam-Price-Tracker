@@ -80,25 +80,18 @@ def confirm_add():
         flash("Ungültige Auswahl.", "error")
         return redirect(url_for("add_game"))
 
-    appid = int(appid_raw)
-    games = common.load_games()
-    if any(g["appid"] == appid for g in games):
-        flash(f"'{name}' wird bereits getrackt.", "info")
-    else:
-        new_game = {"name": name, "appid": appid, "image": image}
-        games.append(new_game)
-        common.save_games(games)
-        price_tracker.record_initial_price(new_game)
+    game, is_new = common.add_game(name, int(appid_raw), image)
+    if is_new:
+        price_tracker.record_initial_price(game)
         flash(f"'{name}' wurde hinzugefügt.", "success")
+    else:
+        flash(f"'{name}' wird bereits getrackt.", "info")
     return redirect(url_for("index"))
 
 
 @app.route("/remove/<int:appid>", methods=["POST"])
 def remove_game(appid):
-    games = common.load_games()
-    removed = next((g for g in games if g["appid"] == appid), None)
-    games = [g for g in games if g["appid"] != appid]
-    common.save_games(games)
+    removed = common.remove_game(appid)
     if removed:
         flash(f"'{removed['name']}' wurde entfernt.", "success")
     return redirect(url_for("index"))

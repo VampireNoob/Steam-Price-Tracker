@@ -115,13 +115,10 @@ def handle_pick(token, chat_id, number_text):
     picked = pending_results[int(number_text) - 1]
     pending_results = []
 
-    games = common.load_games()
-    if any(g["appid"] == picked["appid"] for g in games):
+    new_game, is_new = common.add_game(picked["name"], picked["appid"], picked.get("image"))
+    if not is_new:
         common.send_telegram(token, chat_id, f"'{picked['name']}' wird bereits getrackt.")
         return
-    new_game = {"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")}
-    games.append(new_game)
-    common.save_games(games)
 
     message = f"✅ '{picked['name']}' wird jetzt getrackt."
     if price_tracker.record_initial_price(new_game):
@@ -145,8 +142,10 @@ def handle_remove(token, chat_id, number_text):
             "Bitte /remove <Nummer> verwenden:\n" + "\n".join(lines)
         )
         return
-    removed = games.pop(int(number_text) - 1)
-    common.save_games(games)
+    removed = common.remove_game(games[int(number_text) - 1]["appid"])
+    if removed is None:
+        common.send_telegram(token, chat_id, "Dieses Spiel ist nicht mehr in der Liste.")
+        return
     common.send_telegram(token, chat_id, f"➖ '{removed['name']}' wird nicht mehr getrackt.")
 
 

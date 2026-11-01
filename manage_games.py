@@ -39,14 +39,11 @@ def add_game(token, chat_id):
         return
 
     picked = results[int(choice) - 1]
-    games = common.load_games()
-    if any(g["appid"] == picked["appid"] for g in games):
+    new_game, is_new = common.add_game(picked["name"], picked["appid"], picked.get("image"))
+    if not is_new:
         print(f"'{picked['name']}' wird bereits getrackt.\n")
         return
 
-    new_game = {"name": picked["name"], "appid": picked["appid"], "image": picked.get("image")}
-    games.append(new_game)
-    common.save_games(games)
     print(f"'{picked['name']}' wurde hinzugefügt.")
     if price_tracker.record_initial_price(new_game):
         print(f"Aktueller Preis: {common.get_latest_price(new_game['appid'])['price']}")
@@ -63,8 +60,10 @@ def remove_game(token, chat_id):
         print("Abgebrochen.\n")
         return
 
-    removed = games.pop(int(choice) - 1)
-    common.save_games(games)
+    removed = common.remove_game(games[int(choice) - 1]["appid"])
+    if removed is None:
+        print("Dieses Spiel ist nicht mehr in der Liste.\n")
+        return
     print(f"'{removed['name']}' wurde entfernt.\n")
     common.send_telegram(token, chat_id, f"➖ '{removed['name']}' wird nicht mehr getrackt.")
 
