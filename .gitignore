@@ -5,3 +5,4 @@ __pycache__/
 games.json
 tracker.log
 bot.log
+games.json*

@@ -5,6 +5,7 @@ Telegram-Nachrichten senden, Steam-Suche, letzten bekannten Preis abfragen.
 """
 
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -22,6 +23,8 @@ STEAM_SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 COUNTRY_CODE = "de"
 LANGUAGE = "german"
 
+log = logging.getLogger("common")
+
 
 def load_config():
     load_dotenv(BASE_DIR / ".env")
@@ -35,11 +38,66 @@ def load_config():
     return token, chat_id
 
 
+def _normalize_game(entry):
+    """Prüft einen Eintrag aus games.json. Gibt den bereinigten Eintrag zurück oder None.
+    Unbekannte zusätzliche Felder bleiben erhalten."""
+    if not isinstance(entry, dict):
+        return None
+    name, appid = entry.get("name"), entry.get("appid")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if isinstance(appid, str) and appid.strip().isascii() and appid.strip().isdecimal():
+        appid = int(appid.strip())          # "123" in Anführungszeichen wird zu 123
+    if not isinstance(appid, int) or isinstance(appid, bool) or appid <= 0:
+        return None
+    game = dict(entry)
+    game["name"] = name.strip()
+    game["appid"] = appid
+    if "image" in game and not (game["image"] is None or isinstance(game["image"], str)):
+        game["image"] = None
+    return game
+
+
+def _set_aside_broken_file(exc):
+    """Defekte games.json beiseitelegen statt sie beim nächsten Speichern zu überschreiben."""
+    broken = GAMES_FILE.with_name(GAMES_FILE.name + ".broken")
+    try:
+        os.replace(GAMES_FILE, broken)
+        log.error("games.json ist defekt (%s) und wurde als %s beiseitegelegt", exc, broken.name)
+    except OSError:
+        log.error("games.json ist defekt (%s) und konnte nicht beiseitegelegt werden", exc)
+
+
 def load_games():
+    """Liest games.json. Ungültige Einträge werden übersprungen und protokolliert,
+    eine komplett defekte Datei wird beiseitegelegt. Ein Fehler in der Datei bringt
+    weder die Web-Oberfläche noch den Bot oder den Preis-Check zum Absturz."""
     if not GAMES_FILE.exists():
         return []
-    with open(GAMES_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(GAMES_FILE, "r", encoding="utf-8-sig") as f:   # -sig: BOM von Windows-Editoren
+            text = f.read()
+        if not text.strip():
+            return []                                             # leere Datei = keine Spiele
+        data = json.loads(text)
+        if not isinstance(data, list):
+            raise ValueError("enthält keine Liste")
+    except ValueError as exc:     # JSONDecodeError und UnicodeDecodeError sind ValueError
+        _set_aside_broken_file(exc)
+        return []
+
+    games, seen = [], set()
+    for index, entry in enumerate(data):
+        game = _normalize_game(entry)
+        if game is None:
+            log.warning("games.json: Eintrag %d übersprungen (ungültig): %.80r", index, entry)
+            continue
+        if game["appid"] in seen:
+            log.warning("games.json: Eintrag %d übersprungen (AppID %d doppelt)", index, game["appid"])
+            continue
+        seen.add(game["appid"])
+        games.append(game)
+    return games
 
 
 def save_games(games):
