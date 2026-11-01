@@ -42,15 +42,16 @@ def setup_logging():
     return handler
 
 
-def get_updates(token, offset=None):
+def get_updates(token, offset=None, timeout=POLL_TIMEOUT):
     """Holt neue Telegram-Updates. Gibt eine Liste zurück (leer = nichts Neues)
-    oder None, wenn die Anfrage fehlgeschlagen ist (Netz, Telegram, kaputte Antwort)."""
+    oder None, wenn die Anfrage fehlgeschlagen ist (Netz, Telegram, kaputte Antwort).
+    timeout = wie lange Telegram auf neue Nachrichten warten darf (Long Polling)."""
     url = f"https://api.telegram.org/bot{token}/getUpdates"
-    params = {"timeout": POLL_TIMEOUT}
+    params = {"timeout": timeout}
     if offset is not None:
         params["offset"] = offset
     try:
-        resp = requests.get(url, params=params, timeout=POLL_TIMEOUT + 10)
+        resp = requests.get(url, params=params, timeout=timeout + 10)
         resp.raise_for_status()
         data = resp.json()          # kann ValueError werfen (z.B. HTML statt JSON)
     except (requests.RequestException, ValueError) as exc:
@@ -261,14 +262,32 @@ def poll_once(token, chat_id, offset, failures, sleep=time.sleep):
     return process_updates(token, chat_id, updates, offset), 0
 
 
+def skip_pending_updates(token):
+    """Verwirft Nachrichten, die ankamen, während der Bot nicht lief. Sonst würde z.B.
+    ein Stunden alter '/remove 2' beim Start plötzlich ein anderes Spiel entfernen.
+    Gibt den offset zurück, ab dem verarbeitet wird (None = nichts übersprungen)."""
+    updates = get_updates(token, offset=-1, timeout=0)   # -1 = nur das letzte Update
+    if not updates:
+        return None
+    last_id = updates[-1].get("update_id") if isinstance(updates[-1], dict) else None
+    if not isinstance(last_id, int):
+        return None
+    log.info("Nachrichten aus der Offline-Zeit verworfen (bis update_id %d)", last_id)
+    return last_id + 1
+
+
 def main():
     token, chat_id = common.load_config()
     setup_logging()
     log.info("Bot gestartet")
     print("Bot-Listener gestartet. Strg+C zum Beenden.")
-    common.send_telegram(token, chat_id, "🤖 Bot-Steuerung ist jetzt aktiv. /help für Befehle.")
+    offset = skip_pending_updates(token)
+    startup = "🤖 Bot-Steuerung ist jetzt aktiv. /help für Befehle."
+    if offset is not None:
+        startup += "\nNachrichten aus der Offline-Zeit wurden verworfen."
+    common.send_telegram(token, chat_id, startup)
 
-    offset, failures = None, 0
+    failures = 0
     while True:
         offset, failures = poll_once(token, chat_id, offset, failures)
 
