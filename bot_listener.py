@@ -15,6 +15,7 @@ verarbeitet, alle anderen werden stillschweigend ignoriert.
 """
 
 import logging
+import threading
 import time
 from logging.handlers import RotatingFileHandler
 
@@ -160,10 +161,36 @@ def handle_help(token, chat_id):
     common.send_telegram(token, chat_id, text)
 
 
+_check_lock = threading.Lock()   # verhindert, dass zwei Preis-Checks gleichzeitig laufen
+
+
+def _run_check_in_background(token, chat_id):
+    try:
+        price_tracker.run()
+        common.send_telegram(token, chat_id, "Preis-Check abgeschlossen.")
+    except (Exception, SystemExit):
+        log.exception("Preis-Check im Hintergrund fehlgeschlagen")
+        common.send_telegram(token, chat_id,
+                                "⚠️ Preis-Check fehlgeschlagen, Details stehen in bot.log.")
+    finally:
+        _check_lock.release()
+
+
 def handle_check(token, chat_id):
-    common.send_telegram(token, chat_id, "Preis-Check läuft ...")
-    price_tracker.run()
-    common.send_telegram(token, chat_id, "Preis-Check abgeschlossen.")
+    """Startet den Preis-Check im Hintergrund, damit der Bot währenddessen weiter
+    auf Befehle reagiert. Gibt den Thread zurück (None, wenn schon einer läuft)."""
+    if not _check_lock.acquire(blocking=False):
+        common.send_telegram(token, chat_id, "Ein Preis-Check läuft bereits.")
+        return None
+    try:
+        common.send_telegram(token, chat_id, "Preis-Check läuft ...")
+        thread = threading.Thread(target=_run_check_in_background,
+                                    args=(token, chat_id), daemon=True)
+        thread.start()
+        return thread
+    except BaseException:
+        _check_lock.release()   # Sperre nie dauerhaft blockiert lassen
+        raise
 
 
 def process_message(token, allowed_chat_id, message):
